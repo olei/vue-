@@ -1,5 +1,5 @@
-# vue-
-vue的双向绑定
+# vue双向绑定
+
 ```
 <!DOCTYPE html>
 <html lang="en">
