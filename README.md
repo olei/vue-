@@ -131,3 +131,19 @@
 </body>
 </html>
 ```
+
+### defineProperty
+
+```
+user = {}
+nameValue = 'Joe';
+Object.defineProperty(user, 'name', {
+  get: function(){ return nameValue }, 
+  set: function(newValue){ nameValue = newValue; },
+  configurable: true//to enable redefining the property later
+});
+user.name //Joe 
+user.name = 'Bob'
+user.name //Bob
+nameValue //Bob
+```
