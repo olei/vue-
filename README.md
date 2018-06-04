@@ -18,49 +18,46 @@
 
 function observe (data) {
   Object.keys(data).forEach(key => {
-    defineReactive(data, key, data[key]);
+    let val = data[key];
+    Object.defineProperty(data, key, {
+      get () {
+        return val;
+      },
+      set (newVal) {
+        if (newVal === val) return;
+        val = newVal;
+        Dep.trigger();
+      }
+    })
   });
-}
-
-function defineReactive (data, key, val) {
-  Object.defineProperty(data, key, {
-    get () {
-      return val;
-    },
-    set (newVal) {
-      if (newVal === val) return;
-      val = newVal;
-      Dep.trigger();
-    }
-  })
 }
 
 function toFragment (node, data) {
   const flag = document.createDocumentFragment();
   let child;
   while(child = node.firstChild) {
-    compile(child, data);
+    factory(child, data);
     flag.appendChild(child);
   }
   return flag
 }
 
-function compile (node, data) {
-  var reg = /\{\{(.*)\}\}/;
+function factory (node, data) {
+  const reg = /\{\{(.*)\}\}/;
   if (node.nodeType === 1) {
-    var attr = node.attributes;
-    for (var i = 0, l = attr.length; i < l; i++) {
+    const attr = node.attributes;
+    for (let i = 0, l = attr.length; i < l; i++) {
       if (attr[i].nodeName === 'v-model') {
-        var name = attr[i].nodeValue
+        const name = attr[i].nodeValue
         node.addEventListener('input', e => {
           data[name] = e.target.value;
         });
-        node.removeAttribute('v-model');
         new Watcher(node, data, name, 'input');
+        node.removeAttribute('v-model');
       }
     }
   } else if (node.nodeType === 3 && reg.test(node.nodeValue)) {
-    var name = RegExp.$1;
+    let name = RegExp.$1;
     name = name.trim();
     new Watcher(node, data, name, 'text');
   }
