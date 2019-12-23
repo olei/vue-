@@ -15,122 +15,89 @@
   {{ text1 }}
 </div>
 <script>
-
-function observe (data) {
-  Object.keys(data).forEach(key => {
-    let val = data[key];
-    Object.defineProperty(data, key, {
-      get () {
-        return val;
-      },
-      set (newVal) {
-        if (newVal === val) return;
-        val = newVal;
-        Dep.trigger();
+      // 目标
+      function Subject () {
+        this.list = []
       }
-    })
-  });
-}
 
-function toFragment (node, data) {
-  const flag = document.createDocumentFragment();
-  let child;
-  while(child = node.firstChild) {
-    factory(child, data);
-    flag.appendChild(child);
-  }
-  return flag
-}
-
-function factory (node, data) {
-  const reg = /\{\{(.*)\}\}/;
-  if (node.nodeType === 1) {
-    const attr = node.attributes;
-    for (let i = 0, l = attr.length; i < l; i++) {
-      if (attr[i].nodeName === 'v-model') {
-        const name = attr[i].nodeValue
-        node.addEventListener('input', e => {
-          data[name] = e.target.value;
-        });
-        new Watcher(node, data, name, 'input');
-        node.removeAttribute('v-model');
+      Subject.prototype.add = function (observer) {
+        this.list.push(observer)
       }
-    }
-  } else if (node.nodeType === 3 && reg.test(node.nodeValue)) {
-    let name = RegExp.$1;
-    name = name.trim();
-    new Watcher(node, data, name, 'text');
-  }
-}
 
-//订阅者
-class Watcher {
-  constructor(node, data, name, type) {
-    this.node = node;
-    this.data = data;
-    this.name = name;
-    this.type = type;
-    this.update();
-    Dep.subs.push(this);
-  }
+      Subject.prototype.notify = function () {
+        this.list.forEach(item => {
+          item.updata()
+        })
+      }
+      // 观察者
+      function Watcher (node, name, data) {
+        this.node = node
+        this.name = name
+        this.data = data
+      }
 
-  update () {
-    if (this.type === 'text') {
-      this.node.nodeValue = this.data[this.name];
-      return;
-    }
-    if (this.type === 'input') {
-      this.node.value = this.data[this.name];
-    }
-  }
-}
+      Watcher.prototype.updata = function () {
+        if (this.node.nodeType === 1) this.node.value = this.data[this.name]
+        else if (this.node.nodeType === 3) this.node.nodeValue = this.data[this.name]
+      }
 
-// 发布者
-const Dep = {
-  subs: [],
-  add (obj) {
-    this.subs.push(obj)
-  },
-  trigger () {
-    this.subs.forEach(item => {
-      item.update()
-    })
-  }
-}
+      function Mvvm(options) {
+        this.$el = options.el
+        this.$data = options.data
+        this.subject = new Subject()
+        this.bindData()
+        this.$el.appendChild(this.toFragment())
+      }
 
-// mvvm 构造器
-function Mvvm(opts) {
-  this.data = opts.data;
-  observe(this.data);
-  const el = document.getElementById(opts.el);
-  const dom = toFragment(el, this.data);
-  el.appendChild(dom);
-}
+      Mvvm.prototype.toFragment = function () {
+        const frag = document.createDocumentFragment()
+        let first
+        while (first = this.$el.firstChild) {
+          this.factory(first)
+          frag.appendChild(first)
+        }
+        return frag
+      }
 
-let v = new Mvvm({
-  el: 'app',
-  data: {
-    text: 'hello word',
-    text1: 'test'
-  }
-});
+      Mvvm.prototype.factory = function (node) {
+        let name
+        if (node.nodeType === 1) {
+          name = node.getAttribute('v-model')
+          node.addEventListener('input', e => {
+            this.$data[name] = e.target.value
+          })
+          node.value = this.$data[name]
+        } else if (node.nodeType === 3) {
+          name = node.nodeValue.replace(/\{\{(.*)\}\}/, '$1').trim()
+          node.nodeValue = this.$data[name]
+        }
+        name && this.subject.add(new Watcher(node, name, this.$data))
+      }
+
+      Mvvm.prototype.bindData = function () {
+        const that = this
+        Object.entries(this.$data).forEach(item => {
+          let val = item[1]
+          Object.defineProperty(this.$data, item[0], {
+            get () {
+              return val
+            },
+            set (newVal) {
+              val = newVal
+              that.subject.notify()
+              console.log(`run setter: ${val}`)
+            }
+          })
+        })
+      }
+
+      const test = new Mvvm({
+        el: document.getElementById('app'),
+        data: {
+          text: 'abc',
+          text1: '123'
+        }
+      })
 </script>
 </body>
 </html>
-```
-
-### defineProperty
-
-```
-user = {}
-nameValue = 'Joe';
-Object.defineProperty(user, 'name', {
-  get: function(){ return nameValue }, 
-  set: function(newValue){ nameValue = newValue; },
-  configurable: true//to enable redefining the property later
-});
-user.name //Joe 
-user.name = 'Bob'
-user.name //Bob
-nameValue //Bob
-```
