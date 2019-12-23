@@ -75,16 +75,15 @@
       }
 
       Mvvm.prototype.bindData = function () {
-        const that = this
         Object.entries(this.$data).forEach(item => {
           let val = item[1]
           Object.defineProperty(this.$data, item[0], {
             get () {
               return val
             },
-            set (newVal) {
+            set: newVal => {
               val = newVal
-              that.subject.notify()
+              this.subject.notify()
               console.log(`run setter: ${val}`)
             }
           })
