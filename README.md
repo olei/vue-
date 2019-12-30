@@ -15,88 +15,118 @@
   {{ text1 }}
 </div>
 <script>
-      // 目标
-      function Subject () {
-        this.list = []
-      }
-
-      Subject.prototype.add = function (observer) {
-        this.list.push(observer)
-      }
-
-      Subject.prototype.notify = function () {
-        this.list.forEach(item => {
-          item.updata()
-        })
-      }
-      // 观察者
-      function Watcher (node, name, data) {
-        this.node = node
-        this.name = name
-        this.data = data
-      }
-
-      Watcher.prototype.updata = function () {
-        if (this.node.nodeType === 1) this.node.value = this.data[this.name]
-        else if (this.node.nodeType === 3) this.node.nodeValue = this.data[this.name]
-      }
-
-      function Mvvm(options) {
-        this.$el = options.el
-        this.$data = options.data
-        this.subject = new Subject()
-        this.bindData()
-        this.$el.appendChild(this.toFragment())
-      }
-
-      Mvvm.prototype.toFragment = function () {
-        const frag = document.createDocumentFragment()
-        let first
-        while (first = this.$el.firstChild) {
-          this.factory(first)
-          frag.appendChild(first)
-        }
-        return frag
-      }
-
-      Mvvm.prototype.factory = function (node) {
-        let name
-        if (node.nodeType === 1) {
-          name = node.getAttribute('v-model')
-          node.addEventListener('input', e => {
-            this.$data[name] = e.target.value
-          })
-          node.value = this.$data[name]
-        } else if (node.nodeType === 3) {
-          name = node.nodeValue.replace(/\{\{(.*)\}\}/, '$1').trim()
-          node.nodeValue = this.$data[name]
-        }
-        name && this.subject.add(new Watcher(node, name, this.$data))
-      }
-
-      Mvvm.prototype.bindData = function () {
-        Object.entries(this.$data).forEach(item => {
-          let val = item[1]
-          Object.defineProperty(this.$data, item[0], {
-            get () {
-              return val
-            },
-            set: newVal => {
-              val = newVal
-              this.subject.notify()
-              console.log(`run setter: ${val}`)
-            }
-          })
-        })
-      }
-
-      const test = new Mvvm({
-        el: document.getElementById('app'),
-        data: {
-          text: 'abc',
-          text1: '123'
-        }
+    function Dep() {
+      this.observerList = []
+    }
+    Dep.prototype.add = function(observer) {
+      this.observerList.push(observer)
+    }
+    Dep.prototype.notify = function(watch) {
+      this.observerList.forEach(item => {
+        item.updata && item.updata()
       })
+    }
+
+    function Observer(node, name, data) {
+      this.node = node
+      this.name = name
+      this.data = data
+    }
+    Observer.prototype.updata = function() {
+      if (this.node.nodeType === 1) {
+        this.node.value = this.data[this.name]
+      } else if (this.node.nodeType === 3) {
+        this.node.nodeValue = this.data[this.name]
+      }
+    }
+
+    function Mvvm(options) {
+      this.$data = options.data
+      this.$el = document.getElementById(options.el)
+      this.subject = new Dep()
+      this.bindData(this.$data)
+      const dom = this.toFragment()
+      this.$el.appendChild(dom)
+      this.$watch = options.watch
+    }
+
+    Mvvm.prototype.toFragment = function() {
+      const frag = document.createDocumentFragment()
+      let first
+      while (first = this.$el.firstChild) {
+        frag.appendChild(first)
+        this.factory(first)
+      }
+      return frag
+    }
+
+    Mvvm.prototype.factory = function(node) {
+      let name
+      if (node.nodeType === 1) {
+        name = node.getAttribute('v-modal')
+        node.value = this.$data[name]
+        node.addEventListener('input', e => {
+          this.$data[name] = e.target.value
+        })
+      } else if (node.nodeType === 3) {
+        name = node.nodeValue.replace(/\{\{(.*)\}\}/, '$1').trim()
+        node.nodeValue = this.$data[name]
+      }
+      name && this.subject.add(new Observer(node, name, this.$data))
+    }
+
+    Mvvm.prototype.watch = function(name, val, oldVal) {
+      this.$watch[name] && this.$watch[name](val, oldVal)
+    }
+
+    Mvvm.prototype.bindData = function(data) {
+      Object.entries(data).forEach(item => {
+        let [key, val] = item
+        Object.defineProperty(data, key, {
+          get: () => val,
+          set: newVal => {
+            const oldVal = val
+            val = newVal
+            this.watch(key, val, oldVal)
+            this.subject.notify()
+          }
+        })
+        Array.isArray(val) && this.bindArray(val, key)
+      })
+    }
+
+    Mvvm.prototype.bindArray = function(arr, key) {
+      const defArray = Object.create(Array.prototype);
+      ['push', 'pop'].forEach(item => {
+        Object.defineProperty(defArray, item, {
+          enumerable: true,
+          configurable: true,
+          value: (...args) => {
+            const oldVal = arr.slice()
+            Array.prototype.push.apply(arr, args)
+            this.subject.notify()
+            this.watch(key, arr, oldVal)
+          }
+        })
+      })
+      arr.__proto__ = defArray
+    }
+
+    const app = new Mvvm({
+      el: 'app',
+      data: {
+        text: 'abc',
+        arr: [1, 2]
+      },
+      watch: {
+        text (val, oldVal) {
+          console.log(val, oldVal)
+        },
+        arr (val, oldVal) {
+          console.log(val, oldVal)
+        },
+      }
+    })
 </script>
 </body>
 </html>
